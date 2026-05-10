@@ -8,7 +8,6 @@
 #include <limits>
 #include <numeric>
 #include <optional>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -62,15 +61,15 @@ optional<string> next_value(int& index, int argc, char** argv) {
 }
 
 size_t parse_size(const string& value, const string& flag) {
+    size_t consumed = 0;
     unsigned long long parsed = 0;
-    istringstream input(value);
-    input >> parsed;
-    if (!input) {
+    try {
+        parsed = stoull(value, &consumed);
+    } catch (const exception&) {
         fail("Invalid numeric value for " + flag + ": " + value);
     }
 
-    input >> ws;
-    if (!input.eof()) {
+    if (consumed != value.size()) {
         fail("Invalid numeric value for " + flag + ": " + value);
     }
 
@@ -225,8 +224,8 @@ vector<double> make_heat_grid(size_t rows, size_t cols) {
     vector<double> grid(rows * cols, 0.0);
     for (size_t row = 1; row + 1 < rows; ++row) {
         for (size_t col = 1; col + 1 < cols; ++col) {
-            const bool hot_spot = abs(static_cast<long long>(row) - static_cast<long long>(rows / 2)) <= 1 &&
-                                  abs(static_cast<long long>(col) - static_cast<long long>(cols / 2)) <= 1;
+            const bool hot_spot = std::abs(static_cast<long long>(row) - static_cast<long long>(rows / 2)) <= 1 &&
+                                  std::abs(static_cast<long long>(col) - static_cast<long long>(cols / 2)) <= 1;
             grid[row * cols + col] = hot_spot ? 100.0 : static_cast<double>((row + col) % 9);
         }
     }
@@ -404,7 +403,7 @@ int run_heat(const Options& options, int world_rank, int world_size) {
                                             current[index + 1] +
                                             current[index - cols] +
                                             current[index + cols]) / 5.0;
-                    local_delta = max(local_delta, abs(updated - current[index]));
+                    local_delta = max(local_delta, std::abs(updated - current[index]));
                     next[index] = updated;
                 }
             }
