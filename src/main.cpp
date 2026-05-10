@@ -57,7 +57,8 @@ optional<string> next_value(int& index, int argc, char** argv) {
     if (index + 1 >= argc) {
         return nullopt;
     }
-    return argv[++index];
+    ++index;
+    return argv[index];
 }
 
 size_t parse_size(const string& value, const string& flag) {
