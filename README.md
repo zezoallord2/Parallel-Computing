@@ -10,8 +10,8 @@ The project exposes two runtime-selectable distributed algorithms from different
   - 2D heat diffusion stencil
   - Row-wise grid decomposition with halo exchange
   - Supports uneven row counts and more ranks than rows through active-worker communicators
-- **Category B – Data / Computation:** `prefix`
-  - Distributed prefix sum on a large vector
+- **Category B – Data / Computation:** `matrix`
+  - Distributed data-splitting computation (prefix-style accumulation) on a large vector
   - Supports uneven element counts and more ranks than data chunks
 
 ## Communication strategies
@@ -22,16 +22,33 @@ The system demonstrates multiple communication patterns:
   - Uses `MPI_Send` / `MPI_Recv` for halo exchange
 - **Non-blocking point-to-point:** `heat --comm nonblocking`
   - Uses `MPI_Isend` / `MPI_Irecv` for halo exchange
-- **Pipeline pattern:** `prefix --comm pipeline`
+- **Pipeline pattern:** `matrix --comm pipeline`
   - Passes partial totals rank-by-rank
 - **Collective-based communication:**
   - `MPI_Scatterv` / `MPI_Gatherv` for uneven distribution
   - `MPI_Allreduce` for heat-diffusion convergence tracking
-  - `MPI_Exscan` via `prefix --comm collective`
+  - `MPI_Exscan` via `matrix --comm collective`
 
 ## Process organization
 
 The implementation uses `MPI_Comm_split` to create an **active-worker communicator** that excludes ranks with zero assigned rows/elements. This keeps the program correct for any `N >= 2`, even when the data size is smaller than the process count.
+
+
+## File structure
+
+```text
+/project-root
+│
+├── main.cpp
+├── communication.hpp
+├── communication.cpp
+├── algorithms/
+│   ├── heat_diffusion.cpp
+│   └── matrix_mult.cpp
+├── utils.hpp
+├── utils.cpp
+└── Makefile
+```
 
 ## Build
 
@@ -52,8 +69,8 @@ mpirun --allow-run-as-root --oversubscribe -np 4 ./build/parallel_mpi heat --row
 ### Prefix sum
 
 ```bash
-mpirun --allow-run-as-root --oversubscribe -np 4 ./build/parallel_mpi prefix --size 1000000 --comm pipeline
-mpirun --allow-run-as-root --oversubscribe -np 4 ./build/parallel_mpi prefix --size 1000000 --comm collective
+mpirun --allow-run-as-root --oversubscribe -np 4 ./build/parallel_mpi matrix --size 1000000 --comm pipeline
+mpirun --allow-run-as-root --oversubscribe -np 4 ./build/parallel_mpi matrix --size 1000000 --comm collective
 ```
 
 ## Input file formats
@@ -103,12 +120,12 @@ This implementation fixes the problem in two ways:
 Representative observations from local runs on this repository setup. These values were captured on a single-host Ubuntu CI-style runner using OpenMPI 3.1 with oversubscribed ranks, and are only representative examples; actual timings will vary with hardware, network setup, MPI runtime configuration, and system load:
 
 - `heat --rows 32 --cols 32 --iterations 20` on 4 ranks completed in about `0.000430s` with blocking exchange and `0.000400s` with non-blocking exchange.
-- `prefix --size 1000` on 4 ranks completed in about `0.000026s` with pipeline mode and `0.000023s` with collective mode on this small test.
+- `matrix --size 1000` on 4 ranks completed in about `0.000026s` with pipeline mode and `0.000023s` with collective mode on this small test.
 - The heat stencil shows visible communication impact because every iteration requires neighbor exchange.
-- The prefix pipeline is simple but serialized across ranks, so collective scan is the better scaling direction for larger runs.
+- The matrix pipeline mode is simple but serialized across ranks, so collective scan is the better scaling direction for larger runs.
 
 ## Notes
 
 - The program requires at least 2 MPI processes.
 - The active-worker communicator keeps inactive ranks safe when `rows < processes` or `size < processes`.
-- The root process validates the final distributed prefix sum against a serial reference result.
+- The root process validates the final distributed computation result against a serial reference result.
