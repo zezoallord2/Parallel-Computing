@@ -68,7 +68,7 @@ size_t parse_size(const string& value, const string& flag) {
         if (consumed != value.size()) {
             fail("Invalid numeric value for " + flag + ": " + value);
         }
-        if (parsed > numeric_limits<size_t>::max()) {
+        if (parsed > static_cast<unsigned long long>(numeric_limits<size_t>::max())) {
             fail("Numeric value for " + flag + " is too large: " + value);
         }
         return static_cast<size_t>(parsed);
