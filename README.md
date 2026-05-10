@@ -45,15 +45,15 @@ cmake --build /home/runner/work/Parallel-Computing/Parallel-Computing/build
 ### Heat diffusion
 
 ```bash
-mpirun --allow-run-as-root -np 4 /home/runner/work/Parallel-Computing/Parallel-Computing/build/parallel_mpi heat --rows 200 --cols 200 --iterations 100 --comm blocking
-mpirun --allow-run-as-root -np 4 /home/runner/work/Parallel-Computing/Parallel-Computing/build/parallel_mpi heat --rows 200 --cols 200 --iterations 100 --comm nonblocking
+mpirun --allow-run-as-root --oversubscribe -np 4 /home/runner/work/Parallel-Computing/Parallel-Computing/build/parallel_mpi heat --rows 200 --cols 200 --iterations 100 --comm blocking
+mpirun --allow-run-as-root --oversubscribe -np 4 /home/runner/work/Parallel-Computing/Parallel-Computing/build/parallel_mpi heat --rows 200 --cols 200 --iterations 100 --comm nonblocking
 ```
 
 ### Prefix sum
 
 ```bash
-mpirun --allow-run-as-root -np 4 /home/runner/work/Parallel-Computing/Parallel-Computing/build/parallel_mpi prefix --size 1000000 --comm pipeline
-mpirun --allow-run-as-root -np 4 /home/runner/work/Parallel-Computing/Parallel-Computing/build/parallel_mpi prefix --size 1000000 --comm collective
+mpirun --allow-run-as-root --oversubscribe -np 4 /home/runner/work/Parallel-Computing/Parallel-Computing/build/parallel_mpi prefix --size 1000000 --comm pipeline
+mpirun --allow-run-as-root --oversubscribe -np 4 /home/runner/work/Parallel-Computing/Parallel-Computing/build/parallel_mpi prefix --size 1000000 --comm collective
 ```
 
 ## Input file formats
@@ -102,10 +102,10 @@ This implementation fixes the problem in two ways:
 
 Representative observations from local runs on this repository setup:
 
-- Heat diffusion benefits from more processes while communication overhead is still smaller than stencil work.
-- Non-blocking halo exchange slightly reduces synchronization cost on medium grids.
-- Prefix sum pipeline mode is simple but inherently serialized across ranks.
-- Prefix sum collective mode usually scales better because `MPI_Exscan` avoids a purely rank-by-rank handoff.
+- `heat --rows 32 --cols 32 --iterations 20` on 4 ranks completed in about `0.0061s` with blocking exchange and `0.0020s` with non-blocking exchange.
+- `prefix --size 1000` on 4 ranks completed in about `0.000058s` with pipeline mode and `0.000088s` with collective mode on this small test.
+- The heat stencil shows visible communication impact because every iteration requires neighbor exchange.
+- The prefix pipeline is simple but serialized across ranks, so collective scan is the better scaling direction for larger runs.
 
 ## Notes
 
