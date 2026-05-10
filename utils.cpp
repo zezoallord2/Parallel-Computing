@@ -28,7 +28,7 @@ std::string usage() {
         "Usage:\n"
         "  mpirun -np <p> ./parallel_mpi heat [--rows N --cols N --iterations N] [--input file] [--output file] [--comm blocking|nonblocking]\n"
         "  mpirun -np <p> ./parallel_mpi matrix [--size N] [--input file] [--output file] [--comm pipeline|collective]\n"
-        "    (Category B data-splitting computation with distributed prefix accumulation)\n\n"
+        "    (Category B vector accumulation workflow implemented in algorithms/matrix_mult.cpp)\n\n"
         "Matrix file format:\n"
         "  <rows> <cols> followed by rows*cols floating-point values\n\n"
         "Vector file format:\n"

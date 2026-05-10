@@ -7,7 +7,7 @@
 
 namespace pc {
 int run_heat_diffusion(const Options& options, int world_rank, int world_size);
-int run_category_b_data_compute(const Options& options, int world_rank, int world_size);
+int run_vector_accumulation(const Options& options, int world_rank, int world_size);
 }  // namespace pc
 
 int main(int argc, char** argv) {
@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
         if (options.algorithm == "heat") {
             exit_code = pc::run_heat_diffusion(options, world_rank, world_size);
         } else if (options.algorithm == "matrix") {
-            exit_code = pc::run_category_b_data_compute(options, world_rank, world_size);
+            exit_code = pc::run_vector_accumulation(options, world_rank, world_size);
         }
     } catch (const std::exception&) {
         exit_code = 1;

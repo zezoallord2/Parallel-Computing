@@ -11,7 +11,7 @@
 
 namespace pc {
 
-int run_category_b_data_compute(const Options& options, int world_rank, int world_size) {
+int run_vector_accumulation(const Options& options, int world_rank, int world_size) {
     std::size_t count = options.vector_size;
     std::vector<long long> global_values;
 
