@@ -28,7 +28,7 @@ struct Options {
 };
 
 [[noreturn]] void fail(const std::string& message, int rank = -1) {
-    if (rank <= 0) {
+    if (rank < 0 || rank == 0) {
         std::cerr << message << '\n';
     }
     throw std::runtime_error(message);

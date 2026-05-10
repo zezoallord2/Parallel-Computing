@@ -100,7 +100,7 @@ This implementation fixes the problem in two ways:
 
 ## Performance observations
 
-Representative observations from local runs on this repository setup:
+Representative observations from local runs on this repository setup. These values were captured on an oversubscribed CI-style runner and should be treated as examples, not fixed expectations:
 
 - `heat --rows 32 --cols 32 --iterations 20` on 4 ranks completed in about `0.00043s` with blocking exchange and `0.00040s` with non-blocking exchange.
 - `prefix --size 1000` on 4 ranks completed in about `0.000026s` with pipeline mode and `0.000023s` with collective mode on this small test.
