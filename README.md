@@ -36,8 +36,8 @@ The implementation uses `MPI_Comm_split` to create an **active-worker communicat
 ## Build
 
 ```bash
-cmake -S /home/runner/work/Parallel-Computing/Parallel-Computing -B /home/runner/work/Parallel-Computing/Parallel-Computing/build
-cmake --build /home/runner/work/Parallel-Computing/Parallel-Computing/build
+cmake -S . -B build
+cmake --build build
 ```
 
 ## Run
@@ -45,15 +45,15 @@ cmake --build /home/runner/work/Parallel-Computing/Parallel-Computing/build
 ### Heat diffusion
 
 ```bash
-mpirun --allow-run-as-root --oversubscribe -np 4 /home/runner/work/Parallel-Computing/Parallel-Computing/build/parallel_mpi heat --rows 200 --cols 200 --iterations 100 --comm blocking
-mpirun --allow-run-as-root --oversubscribe -np 4 /home/runner/work/Parallel-Computing/Parallel-Computing/build/parallel_mpi heat --rows 200 --cols 200 --iterations 100 --comm nonblocking
+mpirun --allow-run-as-root --oversubscribe -np 4 ./build/parallel_mpi heat --rows 200 --cols 200 --iterations 100 --comm blocking
+mpirun --allow-run-as-root --oversubscribe -np 4 ./build/parallel_mpi heat --rows 200 --cols 200 --iterations 100 --comm nonblocking
 ```
 
 ### Prefix sum
 
 ```bash
-mpirun --allow-run-as-root --oversubscribe -np 4 /home/runner/work/Parallel-Computing/Parallel-Computing/build/parallel_mpi prefix --size 1000000 --comm pipeline
-mpirun --allow-run-as-root --oversubscribe -np 4 /home/runner/work/Parallel-Computing/Parallel-Computing/build/parallel_mpi prefix --size 1000000 --comm collective
+mpirun --allow-run-as-root --oversubscribe -np 4 ./build/parallel_mpi prefix --size 1000000 --comm pipeline
+mpirun --allow-run-as-root --oversubscribe -np 4 ./build/parallel_mpi prefix --size 1000000 --comm collective
 ```
 
 ## Input file formats

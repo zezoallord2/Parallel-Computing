@@ -455,7 +455,7 @@ int run_prefix(const Options& options, int world_rank, int world_size) {
                                                    : load_vector_file(options.input_path, count);
     }
 
-    auto count_as_ull = static_cast<unsigned long long>(count);
+    unsigned long long count_as_ull = static_cast<unsigned long long>(count);
     MPI_Bcast(&count_as_ull, 1, MPI_UNSIGNED_LONG_LONG, 0, MPI_COMM_WORLD);
     count = static_cast<std::size_t>(count_as_ull);
 
