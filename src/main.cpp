@@ -143,6 +143,8 @@ std::pair<std::vector<int>, std::vector<int>> balanced_counts(std::size_t total,
     const std::size_t base = total / static_cast<std::size_t>(world_size);
     const std::size_t remainder = total % static_cast<std::size_t>(world_size);
 
+    // Distribute the remainder to the first ranks so the program still works
+    // when rows/elements are not evenly divisible by the process count.
     for (int rank = 0; rank < world_size; ++rank) {
         const std::size_t count = base + (static_cast<std::size_t>(rank) < remainder ? 1U : 0U);
         counts[rank] = to_int(count, "Chunk size");
@@ -236,6 +238,8 @@ void exchange_with_neighbor_blocking(MPI_Comm comm, int self_rank, int neighbor_
         return;
     }
 
+    // Rank ordering prevents the classic deadlock where both neighbors call
+    // MPI_Send first and neither side has posted a receive yet.
     if (self_rank < neighbor_rank) {
         MPI_Send(send_buffer, width, MPI_DOUBLE, neighbor_rank, 0, comm);
         MPI_Recv(recv_buffer, width, MPI_DOUBLE, neighbor_rank, 1, comm, MPI_STATUS_IGNORE);
@@ -265,6 +269,8 @@ void exchange_halos_nonblocking(MPI_Comm active_comm, int active_rank, int activ
     const int top = active_rank > 0 ? active_rank - 1 : MPI_PROC_NULL;
     const int bottom = active_rank + 1 < active_size ? active_rank + 1 : MPI_PROC_NULL;
 
+    // Post all receives/sends first, then wait once, so communication can
+    // progress without forcing a strict send-then-receive order.
     std::vector<MPI_Request> requests;
     requests.reserve(4);
 
@@ -334,6 +340,8 @@ int run_heat(const Options& options, int world_rank, int world_size) {
                  MPI_COMM_WORLD);
 
     MPI_Comm active_comm = MPI_COMM_NULL;
+    // Ranks with zero rows are removed from stencil communication, which keeps
+    // neighbor exchange logic simple even when processes outnumber rows.
     MPI_Comm_split(MPI_COMM_WORLD, local_rows > 0 ? 1 : MPI_UNDEFINED, world_rank, &active_comm);
 
     int active_rank = -1;
@@ -381,6 +389,7 @@ int run_heat(const Options& options, int world_rank, int world_size) {
                         continue;
                     }
 
+                    // Five-point stencil: center + left + right + top + bottom.
                     const double updated = (current[index] +
                                             current[index - 1] +
                                             current[index + 1] +
@@ -474,6 +483,7 @@ int run_prefix(const Options& options, int world_rank, int world_size) {
                  MPI_COMM_WORLD);
 
     MPI_Comm active_comm = MPI_COMM_NULL;
+    // Prefix computation only involves ranks that received elements.
     MPI_Comm_split(MPI_COMM_WORLD, local_count > 0 ? 1 : MPI_UNDEFINED, world_rank, &active_comm);
 
     int active_rank = -1;
@@ -496,6 +506,8 @@ int run_prefix(const Options& options, int world_rank, int world_size) {
         long long offset = 0;
 
         if (options.comm_mode == "pipeline") {
+            // Each rank receives the cumulative total of all previous ranks,
+            // shifts its local prefix values, then forwards the new total.
             if (active_rank > 0) {
                 MPI_Recv(&offset, 1, MPI_LONG_LONG, active_rank - 1, 77, active_comm, MPI_STATUS_IGNORE);
             }
@@ -507,6 +519,8 @@ int run_prefix(const Options& options, int world_rank, int world_size) {
                 MPI_Send(&outgoing, 1, MPI_LONG_LONG, active_rank + 1, 77, active_comm);
             }
         } else if (options.comm_mode == "collective") {
+            // MPI_Exscan gives each rank the sum of all earlier ranks without
+            // explicitly stepping through the communicator one process at a time.
             MPI_Exscan(&local_total, &offset, 1, MPI_LONG_LONG, MPI_SUM, active_comm);
             if (active_rank == 0) {
                 offset = 0;
@@ -594,6 +608,7 @@ int main(int argc, char** argv) {
     }
 
     int global_exit_code = 0;
+    // If any rank fails, return a non-zero code for the whole MPI job.
     MPI_Allreduce(&exit_code, &global_exit_code, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
     MPI_Finalize();
     return global_exit_code;
