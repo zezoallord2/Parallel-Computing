@@ -58,7 +58,7 @@ optional<string> next_value(int& index, int argc, char** argv) {
         return nullopt;
     }
     ++index;
-    return argv[index];
+    return string(argv[index]);
 }
 
 size_t parse_size(const string& value, const string& flag) {
@@ -68,8 +68,13 @@ size_t parse_size(const string& value, const string& flag) {
         if (consumed != value.size()) {
             fail("Invalid numeric value for " + flag + ": " + value);
         }
+        if (parsed > numeric_limits<size_t>::max()) {
+            fail("Numeric value for " + flag + " is too large: " + value);
+        }
         return static_cast<size_t>(parsed);
-    } catch (const exception&) {
+    } catch (const invalid_argument&) {
+        fail("Invalid numeric value for " + flag + ": " + value);
+    } catch (const out_of_range&) {
         fail("Invalid numeric value for " + flag + ": " + value);
     }
 }
