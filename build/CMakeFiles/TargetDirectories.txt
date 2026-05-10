@@ -1,3 +1,0 @@
-/home/runner/work/Parallel-Computing/Parallel-Computing/build/CMakeFiles/parallel_mpi.dir
-/home/runner/work/Parallel-Computing/Parallel-Computing/build/CMakeFiles/edit_cache.dir
-/home/runner/work/Parallel-Computing/Parallel-Computing/build/CMakeFiles/rebuild_cache.dir
