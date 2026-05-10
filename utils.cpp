@@ -27,7 +27,8 @@ std::string usage() {
     return
         "Usage:\n"
         "  mpirun -np <p> ./parallel_mpi heat [--rows N --cols N --iterations N] [--input file] [--output file] [--comm blocking|nonblocking]\n"
-        "  mpirun -np <p> ./parallel_mpi matrix [--size N] [--input file] [--output file] [--comm pipeline|collective]\n\n"
+        "  mpirun -np <p> ./parallel_mpi matrix [--size N] [--input file] [--output file] [--comm pipeline|collective]\n"
+        "    (Category B data-splitting computation with distributed prefix accumulation)\n\n"
         "Matrix file format:\n"
         "  <rows> <cols> followed by rows*cols floating-point values\n\n"
         "Vector file format:\n"
@@ -74,8 +75,7 @@ Options parse_args(int argc, char** argv, int rank) {
 
     if (options.algorithm == "heat") {
         options.comm_mode = "blocking";
-    } else if (options.algorithm == "matrix" || options.algorithm == "prefix") {
-        options.algorithm = "matrix";
+    } else if (options.algorithm == "matrix") {
         options.comm_mode = "pipeline";
     } else {
         fail("Unsupported algorithm: " + options.algorithm + "\n\n" + usage(), rank);

@@ -12,12 +12,12 @@ OBJ := $(SRC:.cpp=.o)
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-$(CXX) $(OBJ) -o $@
+	$(CXX) $(OBJ) -o $@
 
 %.o: %.cpp
-$(CXX) $(CXXFLAGS) -I. -c $< -o $@
+	$(CXX) $(CXXFLAGS) -I. -c $< -o $@
 
 clean:
-rm -f $(OBJ) $(TARGET)
+	rm -f $(OBJ) $(TARGET)
 
 .PHONY: all clean

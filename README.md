@@ -11,7 +11,7 @@ The project exposes two runtime-selectable distributed algorithms from different
   - Row-wise grid decomposition with halo exchange
   - Supports uneven row counts and more ranks than rows through active-worker communicators
 - **Category B – Data / Computation:** `matrix`
-  - Distributed prefix sum on a large vector
+  - Distributed data-splitting computation (prefix-style accumulation) on a large vector
   - Supports uneven element counts and more ranks than data chunks
 
 ## Communication strategies
@@ -120,9 +120,9 @@ This implementation fixes the problem in two ways:
 Representative observations from local runs on this repository setup. These values were captured on a single-host Ubuntu CI-style runner using OpenMPI 3.1 with oversubscribed ranks, and are only representative examples; actual timings will vary with hardware, network setup, MPI runtime configuration, and system load:
 
 - `heat --rows 32 --cols 32 --iterations 20` on 4 ranks completed in about `0.000430s` with blocking exchange and `0.000400s` with non-blocking exchange.
-- `prefix --size 1000` on 4 ranks completed in about `0.000026s` with pipeline mode and `0.000023s` with collective mode on this small test.
+- `matrix --size 1000` on 4 ranks completed in about `0.000026s` with pipeline mode and `0.000023s` with collective mode on this small test.
 - The heat stencil shows visible communication impact because every iteration requires neighbor exchange.
-- The prefix pipeline is simple but serialized across ranks, so collective scan is the better scaling direction for larger runs.
+- The matrix pipeline mode is simple but serialized across ranks, so collective scan is the better scaling direction for larger runs.
 
 ## Notes
 

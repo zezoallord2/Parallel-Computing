@@ -11,7 +11,7 @@
 
 namespace pc {
 
-int run_matrix_mult(const Options& options, int world_rank, int world_size) {
+int run_category_b_data_compute(const Options& options, int world_rank, int world_size) {
     std::size_t count = options.vector_size;
     std::vector<long long> global_values;
 
@@ -67,7 +67,7 @@ int run_matrix_mult(const Options& options, int world_rank, int world_size) {
                 offset = 0;
             }
         } else {
-            fail("Matrix workflow supports only --comm pipeline|collective", world_rank);
+            fail("Category B data computation supports only --comm pipeline|collective", world_rank);
         }
 
         for (long long& value : local_values) {
@@ -106,7 +106,7 @@ int run_matrix_mult(const Options& options, int world_rank, int world_size) {
         }
         const auto checksum = std::accumulate(result.begin(), result.end(), 0LL);
         const int active_processes = static_cast<int>(std::count_if(counts.begin(), counts.end(), [](int chunk) { return chunk > 0; }));
-        std::cout << "algorithm=matrix comm=" << options.comm_mode
+        std::cout << "algorithm=matrix category=data_split_compute comm=" << options.comm_mode
                   << " size=" << count
                   << " active_processes=" << active_processes
                   << " checksum=" << checksum
