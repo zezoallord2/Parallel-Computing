@@ -8,39 +8,40 @@
 #include <limits>
 #include <numeric>
 #include <optional>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 
+using namespace std;
+
 namespace {
 
 struct Options {
-    std::string algorithm;
-    std::string comm_mode;
-    std::string input_path;
-    std::string output_path;
-    std::size_t rows = 32;
-    std::size_t cols = 32;
-    std::size_t iterations = 20;
-    std::size_t vector_size = 128;
+    string algorithm;
+    string comm_mode;
+    string input_path;
+    string output_path;
+    size_t rows = 32;
+    size_t cols = 32;
+    size_t iterations = 20;
+    size_t vector_size = 128;
 };
 
-[[noreturn]] void fail(const std::string& message, int rank = -1) {
+[[noreturn]] void fail(const string& message, int rank = -1) {
     if (rank < 0 || rank == 0) {
-        std::cerr << message << '\n';
+        cerr << message << '\n';
     }
-    throw std::runtime_error(message);
+    throw runtime_error(message);
 }
 
-void require(bool condition, const std::string& message, int rank = -1) {
+void require(bool condition, const string& message, int rank = -1) {
     if (!condition) {
         fail(message, rank);
     }
 }
 
-std::string usage() {
+string usage() {
     return
         "Usage:\n"
         "  mpirun -np <p> ./parallel_mpi heat [--rows N --cols N --iterations N] [--input file] [--output file] [--comm blocking|nonblocking]\n"
@@ -51,25 +52,32 @@ std::string usage() {
         "  <count> followed by <count> integer values\n";
 }
 
-std::optional<std::string> next_value(int& index, int argc, char** argv) {
+optional<string> next_value(int& index, int argc, char** argv) {
     if (index + 1 >= argc) {
-        return std::nullopt;
+        return nullopt;
     }
     ++index;
-    return std::string(argv[index]);
+    return string(argv[index]);
 }
 
-std::size_t parse_size(const std::string& value, const std::string& flag) {
+size_t parse_size(const string& value, const string& flag) {
+    size_t consumed = 0;
+    unsigned long long parsed = 0;
     try {
-        std::size_t consumed = 0;
-        const auto parsed = std::stoull(value, &consumed);
-        if (consumed != value.size()) {
-            fail("Invalid numeric value for " + flag + ": " + value);
-        }
-        return static_cast<std::size_t>(parsed);
-    } catch (const std::exception&) {
+        parsed = stoull(value, &consumed);
+    } catch (const exception&) {
         fail("Invalid numeric value for " + flag + ": " + value);
     }
+
+    if (consumed != value.size()) {
+        fail("Invalid numeric value for " + flag + ": " + value);
+    }
+
+    if (parsed > static_cast<unsigned long long>(numeric_limits<size_t>::max())) {
+        fail("Numeric value for " + flag + " is too large: " + value);
+    }
+
+    return static_cast<size_t>(parsed);
 }
 
 Options parse_args(int argc, char** argv, int rank) {
@@ -87,7 +95,7 @@ Options parse_args(int argc, char** argv, int rank) {
     }
 
     for (int index = 2; index < argc; ++index) {
-        const std::string arg = argv[index];
+        const string arg = argv[index];
         if (arg == "--rows") {
             const auto value = next_value(index, argc, argv);
             require(value.has_value(), "Missing value for --rows", rank);
@@ -130,52 +138,52 @@ Options parse_args(int argc, char** argv, int rank) {
     return options;
 }
 
-int to_int(std::size_t value, const std::string& label) {
-    if (value > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+int to_int(size_t value, const string& label) {
+    if (value > static_cast<size_t>(numeric_limits<int>::max())) {
         fail(label + " is too large for MPI integer counts");
     }
     return static_cast<int>(value);
 }
 
-std::pair<std::vector<int>, std::vector<int>> balanced_counts(std::size_t total, int world_size) {
-    std::vector<int> counts(world_size, 0);
-    std::vector<int> displacements(world_size, 0);
-    const std::size_t base = total / static_cast<std::size_t>(world_size);
-    const std::size_t remainder = total % static_cast<std::size_t>(world_size);
+pair<vector<int>, vector<int>> balanced_counts(size_t total, int world_size) {
+    vector<int> counts(world_size, 0);
+    vector<int> displacements(world_size, 0);
+    const size_t base = total / static_cast<size_t>(world_size);
+    const size_t remainder = total % static_cast<size_t>(world_size);
+    int offset = 0;
 
     // Distribute the remainder to the first ranks so the program still works
     // when rows/elements are not evenly divisible by the process count.
     for (int rank = 0; rank < world_size; ++rank) {
-        const std::size_t count = base + (static_cast<std::size_t>(rank) < remainder ? 1U : 0U);
+        const size_t count = base + (static_cast<size_t>(rank) < remainder ? 1U : 0U);
         counts[rank] = to_int(count, "Chunk size");
-        if (rank > 0) {
-            displacements[rank] = displacements[rank - 1] + counts[rank - 1];
-        }
+        displacements[rank] = offset;
+        offset += counts[rank];
     }
     return {counts, displacements};
 }
 
-std::vector<double> load_matrix_file(const std::string& path, std::size_t& rows, std::size_t& cols) {
-    std::ifstream input(path);
+vector<double> load_matrix_file(const string& path, size_t& rows, size_t& cols) {
+    ifstream input(path);
     require(input.good(), "Failed to open matrix input file: " + path);
 
     input >> rows >> cols;
     require(rows > 0 && cols > 0, "Matrix input must declare positive rows and columns");
 
-    std::vector<double> values(rows * cols, 0.0);
+    vector<double> values(rows * cols, 0.0);
     for (double& value : values) {
         require(static_cast<bool>(input >> value), "Matrix input file ended before all values were read");
     }
     return values;
 }
 
-void write_matrix_file(const std::string& path, std::size_t rows, std::size_t cols, const std::vector<double>& values) {
-    std::ofstream output(path);
+void write_matrix_file(const string& path, size_t rows, size_t cols, const vector<double>& values) {
+    ofstream output(path);
     require(output.good(), "Failed to open matrix output file: " + path);
     output << rows << ' ' << cols << '\n';
-    output << std::fixed << std::setprecision(6);
-    for (std::size_t row = 0; row < rows; ++row) {
-        for (std::size_t col = 0; col < cols; ++col) {
+    output << fixed << setprecision(6);
+    for (size_t row = 0; row < rows; ++row) {
+        for (size_t col = 0; col < cols; ++col) {
             if (col > 0) {
                 output << ' ';
             }
@@ -185,25 +193,25 @@ void write_matrix_file(const std::string& path, std::size_t rows, std::size_t co
     }
 }
 
-std::vector<long long> load_vector_file(const std::string& path, std::size_t& count) {
-    std::ifstream input(path);
+vector<long long> load_vector_file(const string& path, size_t& count) {
+    ifstream input(path);
     require(input.good(), "Failed to open vector input file: " + path);
 
     input >> count;
     require(count > 0, "Vector input must declare a positive element count");
 
-    std::vector<long long> values(count, 0);
+    vector<long long> values(count, 0);
     for (long long& value : values) {
         require(static_cast<bool>(input >> value), "Vector input file ended before all values were read");
     }
     return values;
 }
 
-void write_vector_file(const std::string& path, const std::vector<long long>& values) {
-    std::ofstream output(path);
+void write_vector_file(const string& path, const vector<long long>& values) {
+    ofstream output(path);
     require(output.good(), "Failed to open vector output file: " + path);
     output << values.size() << '\n';
-    for (std::size_t index = 0; index < values.size(); ++index) {
+    for (size_t index = 0; index < values.size(); ++index) {
         if (index > 0) {
             output << ' ';
         }
@@ -212,10 +220,10 @@ void write_vector_file(const std::string& path, const std::vector<long long>& va
     output << '\n';
 }
 
-std::vector<double> make_heat_grid(std::size_t rows, std::size_t cols) {
-    std::vector<double> grid(rows * cols, 0.0);
-    for (std::size_t row = 1; row + 1 < rows; ++row) {
-        for (std::size_t col = 1; col + 1 < cols; ++col) {
+vector<double> make_heat_grid(size_t rows, size_t cols) {
+    vector<double> grid(rows * cols, 0.0);
+    for (size_t row = 1; row + 1 < rows; ++row) {
+        for (size_t col = 1; col + 1 < cols; ++col) {
             const bool hot_spot = std::abs(static_cast<long long>(row) - static_cast<long long>(rows / 2)) <= 1 &&
                                   std::abs(static_cast<long long>(col) - static_cast<long long>(cols / 2)) <= 1;
             grid[row * cols + col] = hot_spot ? 100.0 : static_cast<double>((row + col) % 9);
@@ -224,9 +232,9 @@ std::vector<double> make_heat_grid(std::size_t rows, std::size_t cols) {
     return grid;
 }
 
-std::vector<long long> make_vector(std::size_t count) {
-    std::vector<long long> values(count, 0);
-    for (std::size_t index = 0; index < count; ++index) {
+vector<long long> make_vector(size_t count) {
+    vector<long long> values(count, 0);
+    for (size_t index = 0; index < count; ++index) {
         values[index] = static_cast<long long>((index % 17U) + 1U);
     }
     return values;
@@ -250,7 +258,7 @@ void exchange_with_neighbor_blocking(MPI_Comm comm, int self_rank, int neighbor_
 }
 
 void exchange_halos_blocking(MPI_Comm active_comm, int active_rank, int active_size,
-                             std::vector<double>& current, int local_rows, int cols) {
+                             vector<double>& current, int local_rows, int cols) {
     const int top = active_rank > 0 ? active_rank - 1 : MPI_PROC_NULL;
     const int bottom = active_rank + 1 < active_size ? active_rank + 1 : MPI_PROC_NULL;
 
@@ -259,19 +267,19 @@ void exchange_halos_blocking(MPI_Comm active_comm, int active_rank, int active_s
                                     current.data(),
                                     cols);
     exchange_with_neighbor_blocking(active_comm, active_rank, bottom,
-                                    current.data() + static_cast<std::size_t>(local_rows) * cols,
-                                    current.data() + static_cast<std::size_t>(local_rows + 1) * cols,
+                                    current.data() + static_cast<size_t>(local_rows) * cols,
+                                    current.data() + static_cast<size_t>(local_rows + 1) * cols,
                                     cols);
 }
 
 void exchange_halos_nonblocking(MPI_Comm active_comm, int active_rank, int active_size,
-                                std::vector<double>& current, int local_rows, int cols) {
+                                vector<double>& current, int local_rows, int cols) {
     const int top = active_rank > 0 ? active_rank - 1 : MPI_PROC_NULL;
     const int bottom = active_rank + 1 < active_size ? active_rank + 1 : MPI_PROC_NULL;
 
     // Post all receives/sends first, then wait once, so communication can
     // progress without forcing a strict send-then-receive order.
-    std::vector<MPI_Request> requests;
+    vector<MPI_Request> requests;
     requests.reserve(4);
 
     if (top != MPI_PROC_NULL) {
@@ -286,9 +294,9 @@ void exchange_halos_nonblocking(MPI_Comm active_comm, int active_rank, int activ
     if (bottom != MPI_PROC_NULL) {
         MPI_Request recv_request{};
         MPI_Request send_request{};
-        MPI_Irecv(current.data() + static_cast<std::size_t>(local_rows + 1) * cols,
+        MPI_Irecv(current.data() + static_cast<size_t>(local_rows + 1) * cols,
                   cols, MPI_DOUBLE, bottom, 1, active_comm, &recv_request);
-        MPI_Isend(current.data() + static_cast<std::size_t>(local_rows) * cols,
+        MPI_Isend(current.data() + static_cast<size_t>(local_rows) * cols,
                   cols, MPI_DOUBLE, bottom, 0, active_comm, &send_request);
         requests.push_back(recv_request);
         requests.push_back(send_request);
@@ -300,9 +308,9 @@ void exchange_halos_nonblocking(MPI_Comm active_comm, int active_rank, int activ
 }
 
 int run_heat(const Options& options, int world_rank, int world_size) {
-    std::size_t rows = options.rows;
-    std::size_t cols = options.cols;
-    std::vector<double> global_grid;
+    size_t rows = options.rows;
+    size_t cols = options.cols;
+    vector<double> global_grid;
 
     if (world_rank == 0) {
         global_grid = options.input_path.empty() ? make_heat_grid(rows, cols)
@@ -313,22 +321,22 @@ int run_heat(const Options& options, int world_rank, int world_size) {
     const auto cols_as_ull = static_cast<unsigned long long>(cols);
     unsigned long long dimensions[2] = {rows_as_ull, cols_as_ull};
     MPI_Bcast(dimensions, 2, MPI_UNSIGNED_LONG_LONG, 0, MPI_COMM_WORLD);
-    rows = static_cast<std::size_t>(dimensions[0]);
-    cols = static_cast<std::size_t>(dimensions[1]);
+    rows = static_cast<size_t>(dimensions[0]);
+    cols = static_cast<size_t>(dimensions[1]);
     require(cols >= 2 && rows >= 2, "Heat diffusion requires at least a 2x2 grid", world_rank);
 
     const auto [row_counts, row_displacements] = balanced_counts(rows, world_size);
     const int local_rows = row_counts[world_rank];
     const int local_elements = local_rows * to_int(cols, "Column count");
 
-    std::vector<int> element_counts(world_size, 0);
-    std::vector<int> element_displacements(world_size, 0);
+    vector<int> element_counts(world_size, 0);
+    vector<int> element_displacements(world_size, 0);
     for (int rank = 0; rank < world_size; ++rank) {
         element_counts[rank] = row_counts[rank] * to_int(cols, "Column count");
         element_displacements[rank] = row_displacements[rank] * to_int(cols, "Column count");
     }
 
-    std::vector<double> local_data(static_cast<std::size_t>(std::max(local_elements, 0)), 0.0);
+    vector<double> local_data(static_cast<size_t>(max(local_elements, 0)), 0.0);
     MPI_Scatterv(world_rank == 0 ? global_grid.data() : nullptr,
                  element_counts.data(),
                  element_displacements.data(),
@@ -351,12 +359,12 @@ int run_heat(const Options& options, int world_rank, int world_size) {
         MPI_Comm_size(active_comm, &active_size);
     }
 
-    std::vector<double> current((static_cast<std::size_t>(local_rows) + 2U) * cols, 0.0);
-    std::vector<double> next = current;
+    vector<double> current((static_cast<size_t>(local_rows) + 2U) * cols, 0.0);
+    vector<double> next = current;
     for (int row = 0; row < local_rows; ++row) {
-        std::copy_n(local_data.data() + static_cast<std::size_t>(row) * cols,
+        copy_n(local_data.data() + static_cast<size_t>(row) * cols,
                     cols,
-                    current.data() + static_cast<std::size_t>(row + 1) * cols);
+                    current.data() + static_cast<size_t>(row + 1) * cols);
     }
 
     double final_delta = 0.0;
@@ -366,7 +374,7 @@ int run_heat(const Options& options, int world_rank, int world_size) {
         MPI_Barrier(active_comm);
         const double start = MPI_Wtime();
 
-        for (std::size_t iteration = 0; iteration < options.iterations; ++iteration) {
+        for (size_t iteration = 0; iteration < options.iterations; ++iteration) {
             if (active_size > 1) {
                 if (options.comm_mode == "blocking") {
                     exchange_halos_blocking(active_comm, active_rank, active_size, current, local_rows, to_int(cols, "Column count"));
@@ -381,8 +389,8 @@ int run_heat(const Options& options, int world_rank, int world_size) {
             double local_delta = 0.0;
             for (int local_row = 1; local_row <= local_rows; ++local_row) {
                 const int global_row = global_start_row + local_row - 1;
-                for (std::size_t col = 0; col < cols; ++col) {
-                    const std::size_t index = static_cast<std::size_t>(local_row) * cols + col;
+                for (size_t col = 0; col < cols; ++col) {
+                    const size_t index = static_cast<size_t>(local_row) * cols + col;
                     const bool boundary = global_row == 0 || global_row == static_cast<int>(rows) - 1 || col == 0 || col + 1 == cols;
                     if (boundary) {
                         next[index] = current[index];
@@ -395,12 +403,12 @@ int run_heat(const Options& options, int world_rank, int world_size) {
                                             current[index + 1] +
                                             current[index - cols] +
                                             current[index + cols]) / 5.0;
-                    local_delta = std::max(local_delta, std::abs(updated - current[index]));
+                    local_delta = max(local_delta, std::abs(updated - current[index]));
                     next[index] = updated;
                 }
             }
 
-            std::swap(current, next);
+            swap(current, next);
             MPI_Allreduce(&local_delta, &final_delta, 1, MPI_DOUBLE, MPI_MAX, active_comm);
         }
 
@@ -408,12 +416,12 @@ int run_heat(const Options& options, int world_rank, int world_size) {
     }
 
     for (int row = 0; row < local_rows; ++row) {
-        std::copy_n(current.data() + static_cast<std::size_t>(row + 1) * cols,
+        copy_n(current.data() + static_cast<size_t>(row + 1) * cols,
                     cols,
-                    local_data.data() + static_cast<std::size_t>(row) * cols);
+                    local_data.data() + static_cast<size_t>(row) * cols);
     }
 
-    std::vector<double> result;
+    vector<double> result;
     if (world_rank == 0) {
         result.resize(rows * cols, 0.0);
     }
@@ -436,9 +444,9 @@ int run_heat(const Options& options, int world_rank, int world_size) {
             write_matrix_file(options.output_path, rows, cols, result);
         }
 
-        const double checksum = std::accumulate(result.begin(), result.end(), 0.0);
-        const int active_processes = static_cast<int>(std::count_if(row_counts.begin(), row_counts.end(), [](int count) { return count > 0; }));
-        std::cout << std::fixed << std::setprecision(6)
+        const double checksum = accumulate(result.begin(), result.end(), 0.0);
+        const int active_processes = static_cast<int>(count_if(row_counts.begin(), row_counts.end(), [](int count) { return count > 0; }));
+        cout << fixed << setprecision(6)
                   << "algorithm=heat comm=" << options.comm_mode
                   << " rows=" << rows
                   << " cols=" << cols
@@ -456,8 +464,8 @@ int run_heat(const Options& options, int world_rank, int world_size) {
 }
 
 int run_prefix(const Options& options, int world_rank, int world_size) {
-    std::size_t count = options.vector_size;
-    std::vector<long long> global_values;
+    size_t count = options.vector_size;
+    vector<long long> global_values;
 
     if (world_rank == 0) {
         global_values = options.input_path.empty() ? make_vector(count)
@@ -466,11 +474,11 @@ int run_prefix(const Options& options, int world_rank, int world_size) {
 
     unsigned long long count_as_ull = static_cast<unsigned long long>(count);
     MPI_Bcast(&count_as_ull, 1, MPI_UNSIGNED_LONG_LONG, 0, MPI_COMM_WORLD);
-    count = static_cast<std::size_t>(count_as_ull);
+    count = static_cast<size_t>(count_as_ull);
 
     const auto [counts, displacements] = balanced_counts(count, world_size);
     const int local_count = counts[world_rank];
-    std::vector<long long> local_values(static_cast<std::size_t>(std::max(local_count, 0)), 0);
+    vector<long long> local_values(static_cast<size_t>(max(local_count, 0)), 0);
 
     MPI_Scatterv(world_rank == 0 ? global_values.data() : nullptr,
                  counts.data(),
@@ -535,7 +543,7 @@ int run_prefix(const Options& options, int world_rank, int world_size) {
         local_elapsed = MPI_Wtime() - start;
     }
 
-    std::vector<long long> result;
+    vector<long long> result;
     if (world_rank == 0) {
         result.resize(count, 0);
     }
@@ -554,22 +562,22 @@ int run_prefix(const Options& options, int world_rank, int world_size) {
     MPI_Reduce(&local_elapsed, &max_elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
     if (world_rank == 0) {
-        std::vector<long long> expected = global_values;
-        for (std::size_t index = 1; index < expected.size(); ++index) {
+        vector<long long> expected = global_values;
+        for (size_t index = 1; index < expected.size(); ++index) {
             expected[index] += expected[index - 1];
         }
         const bool valid = result == expected;
         if (!options.output_path.empty()) {
             write_vector_file(options.output_path, result);
         }
-        const auto checksum = std::accumulate(result.begin(), result.end(), 0LL);
-        const int active_processes = static_cast<int>(std::count_if(counts.begin(), counts.end(), [](int chunk) { return chunk > 0; }));
-        std::cout << "algorithm=prefix comm=" << options.comm_mode
+        const auto checksum = accumulate(result.begin(), result.end(), 0LL);
+        const int active_processes = static_cast<int>(count_if(counts.begin(), counts.end(), [](int chunk) { return chunk > 0; }));
+        cout << "algorithm=prefix comm=" << options.comm_mode
                   << " size=" << count
                   << " active_processes=" << active_processes
                   << " checksum=" << checksum
                   << " verification=" << (valid ? "PASSED" : "FAILED")
-                  << " elapsed_seconds=" << std::fixed << std::setprecision(6) << max_elapsed
+                  << " elapsed_seconds=" << fixed << setprecision(6) << max_elapsed
                   << '\n';
         if (!valid) {
             return 2;
@@ -595,7 +603,7 @@ int main(int argc, char** argv) {
     int exit_code = 0;
     try {
         require(world_size >= 2,
-                "Run this program with at least 2 MPI processes (currently running with " + std::to_string(world_size) + ")",
+                "Run this program with at least 2 MPI processes (currently running with " + to_string(world_size) + ")",
                 world_rank);
         const Options options = parse_args(argc, argv, world_rank);
         if (options.algorithm == "heat") {
@@ -603,7 +611,7 @@ int main(int argc, char** argv) {
         } else if (options.algorithm == "prefix") {
             exit_code = run_prefix(options, world_rank, world_size);
         }
-    } catch (const std::exception&) {
+    } catch (const exception&) {
         exit_code = 1;
     }
 
