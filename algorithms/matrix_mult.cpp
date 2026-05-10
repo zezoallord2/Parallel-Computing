@@ -67,7 +67,7 @@ int run_vector_accumulation(const Options& options, int world_rank, int world_si
                 offset = 0;
             }
         } else {
-            fail("Category B data computation supports only --comm pipeline|collective", world_rank);
+            fail("Matrix algorithm supports only --comm pipeline|collective", world_rank);
         }
 
         for (long long& value : local_values) {
