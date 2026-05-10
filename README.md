@@ -10,7 +10,7 @@ The project exposes two runtime-selectable distributed algorithms from different
   - 2D heat diffusion stencil
   - Row-wise grid decomposition with halo exchange
   - Supports uneven row counts and more ranks than rows through active-worker communicators
-- **Category B – Data / Computation:** `prefix`
+- **Category B – Data / Computation:** `matrix`
   - Distributed prefix sum on a large vector
   - Supports uneven element counts and more ranks than data chunks
 
@@ -22,16 +22,33 @@ The system demonstrates multiple communication patterns:
   - Uses `MPI_Send` / `MPI_Recv` for halo exchange
 - **Non-blocking point-to-point:** `heat --comm nonblocking`
   - Uses `MPI_Isend` / `MPI_Irecv` for halo exchange
-- **Pipeline pattern:** `prefix --comm pipeline`
+- **Pipeline pattern:** `matrix --comm pipeline`
   - Passes partial totals rank-by-rank
 - **Collective-based communication:**
   - `MPI_Scatterv` / `MPI_Gatherv` for uneven distribution
   - `MPI_Allreduce` for heat-diffusion convergence tracking
-  - `MPI_Exscan` via `prefix --comm collective`
+  - `MPI_Exscan` via `matrix --comm collective`
 
 ## Process organization
 
 The implementation uses `MPI_Comm_split` to create an **active-worker communicator** that excludes ranks with zero assigned rows/elements. This keeps the program correct for any `N >= 2`, even when the data size is smaller than the process count.
+
+
+## File structure
+
+```text
+/project-root
+│
+├── main.cpp
+├── communication.hpp
+├── communication.cpp
+├── algorithms/
+│   ├── heat_diffusion.cpp
+│   └── matrix_mult.cpp
+├── utils.hpp
+├── utils.cpp
+└── Makefile
+```
 
 ## Build
 
@@ -52,8 +69,8 @@ mpirun --allow-run-as-root --oversubscribe -np 4 ./build/parallel_mpi heat --row
 ### Prefix sum
 
 ```bash
-mpirun --allow-run-as-root --oversubscribe -np 4 ./build/parallel_mpi prefix --size 1000000 --comm pipeline
-mpirun --allow-run-as-root --oversubscribe -np 4 ./build/parallel_mpi prefix --size 1000000 --comm collective
+mpirun --allow-run-as-root --oversubscribe -np 4 ./build/parallel_mpi matrix --size 1000000 --comm pipeline
+mpirun --allow-run-as-root --oversubscribe -np 4 ./build/parallel_mpi matrix --size 1000000 --comm collective
 ```
 
 ## Input file formats
@@ -111,4 +128,4 @@ Representative observations from local runs on this repository setup. These valu
 
 - The program requires at least 2 MPI processes.
 - The active-worker communicator keeps inactive ranks safe when `rows < processes` or `size < processes`.
-- The root process validates the final distributed prefix sum against a serial reference result.
+- The root process validates the final distributed computation result against a serial reference result.
