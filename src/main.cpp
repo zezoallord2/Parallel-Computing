@@ -580,7 +580,9 @@ int main(int argc, char** argv) {
 
     int exit_code = 0;
     try {
-        require(world_size >= 2, "Run this program with at least 2 MPI processes", world_rank);
+        require(world_size >= 2,
+                "Run this program with at least 2 MPI processes (currently running with " + std::to_string(world_size) + ")",
+                world_rank);
         const Options options = parse_args(argc, argv, world_rank);
         if (options.algorithm == "heat") {
             exit_code = run_heat(options, world_rank, world_size);

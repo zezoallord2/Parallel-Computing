@@ -100,7 +100,7 @@ This implementation fixes the problem in two ways:
 
 ## Performance observations
 
-Representative observations from local runs on this repository setup. These values were captured on an oversubscribed CI-style runner and are only representative examples; actual timings will vary with hardware, network setup, MPI runtime configuration, and system load:
+Representative observations from local runs on this repository setup. These values were captured on a single-host Ubuntu CI-style runner using OpenMPI 3.1 with oversubscribed ranks, and are only representative examples; actual timings will vary with hardware, network setup, MPI runtime configuration, and system load:
 
 - `heat --rows 32 --cols 32 --iterations 20` on 4 ranks completed in about `0.000430s` with blocking exchange and `0.000400s` with non-blocking exchange.
 - `prefix --size 1000` on 4 ranks completed in about `0.000026s` with pipeline mode and `0.000023s` with collective mode on this small test.
