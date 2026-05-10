@@ -76,7 +76,7 @@ long long ring_prefix_offset(MPI_Comm active_comm, int active_rank, int active_s
         MPI_Recv(&offset, 1, MPI_LONG_LONG, active_rank - 1, 77, active_comm, MPI_STATUS_IGNORE);
     }
 
-    const long long outgoing = local_values.empty() ? offset : local_values.back();
+    const long long outgoing = local_values.empty() ? offset : (local_values.back() + offset);
     if (active_rank + 1 < active_size) {
         MPI_Send(&outgoing, 1, MPI_LONG_LONG, active_rank + 1, 77, active_comm);
     }
