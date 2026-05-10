@@ -62,21 +62,23 @@ optional<string> next_value(int& index, int argc, char** argv) {
 }
 
 size_t parse_size(const string& value, const string& flag) {
-    try {
-        size_t consumed = 0;
-        const auto parsed = stoull(value, &consumed);
-        if (consumed != value.size()) {
-            fail("Invalid numeric value for " + flag + ": " + value);
-        }
-        if (parsed > static_cast<unsigned long long>(numeric_limits<size_t>::max())) {
-            fail("Numeric value for " + flag + " is too large: " + value);
-        }
-        return static_cast<size_t>(parsed);
-    } catch (const invalid_argument&) {
-        fail("Invalid numeric value for " + flag + ": " + value);
-    } catch (const out_of_range&) {
+    unsigned long long parsed = 0;
+    istringstream input(value);
+    input >> parsed;
+    if (!input) {
         fail("Invalid numeric value for " + flag + ": " + value);
     }
+
+    input >> ws;
+    if (!input.eof()) {
+        fail("Invalid numeric value for " + flag + ": " + value);
+    }
+
+    if (parsed > static_cast<unsigned long long>(numeric_limits<size_t>::max())) {
+        fail("Numeric value for " + flag + " is too large: " + value);
+    }
+
+    return static_cast<size_t>(parsed);
 }
 
 Options parse_args(int argc, char** argv, int rank) {
