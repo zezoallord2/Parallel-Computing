@@ -1,5 +1,7 @@
 #include "communication.hpp"
 
+using namespace std;
+
 namespace pc {
 
 namespace {
@@ -22,7 +24,7 @@ void exchange_with_neighbor_blocking(MPI_Comm comm, int self_rank, int neighbor_
 }  // namespace
 
 void exchange_halos_blocking(MPI_Comm active_comm, int active_rank, int active_size,
-                             std::vector<double>& current, int local_rows, int cols) {
+                             vector<double>& current, int local_rows, int cols) {
     const int top = active_rank > 0 ? active_rank - 1 : MPI_PROC_NULL;
     const int bottom = active_rank + 1 < active_size ? active_rank + 1 : MPI_PROC_NULL;
 
@@ -31,17 +33,17 @@ void exchange_halos_blocking(MPI_Comm active_comm, int active_rank, int active_s
                                     current.data(),
                                     cols);
     exchange_with_neighbor_blocking(active_comm, active_rank, bottom,
-                                    current.data() + static_cast<std::size_t>(local_rows) * cols,
-                                    current.data() + static_cast<std::size_t>(local_rows + 1) * cols,
+                                    current.data() + static_cast<size_t>(local_rows) * cols,
+                                    current.data() + static_cast<size_t>(local_rows + 1) * cols,
                                     cols);
 }
 
 void exchange_halos_nonblocking(MPI_Comm active_comm, int active_rank, int active_size,
-                                std::vector<double>& current, int local_rows, int cols) {
+                                vector<double>& current, int local_rows, int cols) {
     const int top = active_rank > 0 ? active_rank - 1 : MPI_PROC_NULL;
     const int bottom = active_rank + 1 < active_size ? active_rank + 1 : MPI_PROC_NULL;
 
-    std::vector<MPI_Request> requests;
+    vector<MPI_Request> requests;
     requests.reserve(4);
 
     if (top != MPI_PROC_NULL) {
@@ -56,9 +58,9 @@ void exchange_halos_nonblocking(MPI_Comm active_comm, int active_rank, int activ
     if (bottom != MPI_PROC_NULL) {
         MPI_Request recv_request{};
         MPI_Request send_request{};
-        MPI_Irecv(current.data() + static_cast<std::size_t>(local_rows + 1) * cols,
+        MPI_Irecv(current.data() + static_cast<size_t>(local_rows + 1) * cols,
                   cols, MPI_DOUBLE, bottom, 1, active_comm, &recv_request);
-        MPI_Isend(current.data() + static_cast<std::size_t>(local_rows) * cols,
+        MPI_Isend(current.data() + static_cast<size_t>(local_rows) * cols,
                   cols, MPI_DOUBLE, bottom, 0, active_comm, &send_request);
         requests.push_back(recv_request);
         requests.push_back(send_request);
@@ -70,7 +72,7 @@ void exchange_halos_nonblocking(MPI_Comm active_comm, int active_rank, int activ
 }
 
 long long ring_prefix_offset(MPI_Comm active_comm, int active_rank, int active_size,
-                             const std::vector<long long>& local_values) {
+                             const vector<long long>& local_values) {
     long long offset = 0;
     if (active_rank > 0) {
         MPI_Recv(&offset, 1, MPI_LONG_LONG, active_rank - 1, 77, active_comm, MPI_STATUS_IGNORE);

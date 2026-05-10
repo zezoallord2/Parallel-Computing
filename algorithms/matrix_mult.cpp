@@ -9,11 +9,13 @@
 #include <numeric>
 #include <vector>
 
+using namespace std;
+
 namespace pc {
 
 int run_vector_accumulation(const Options& options, int world_rank, int world_size) {
-    std::size_t count = options.vector_size;
-    std::vector<long long> global_values;
+    size_t count = options.vector_size;
+    vector<long long> global_values;
 
     if (world_rank == 0) {
         global_values = options.input_path.empty() ? make_vector(count)
@@ -22,11 +24,11 @@ int run_vector_accumulation(const Options& options, int world_rank, int world_si
 
     unsigned long long count_as_ull = static_cast<unsigned long long>(count);
     MPI_Bcast(&count_as_ull, 1, MPI_UNSIGNED_LONG_LONG, 0, MPI_COMM_WORLD);
-    count = static_cast<std::size_t>(count_as_ull);
+    count = static_cast<size_t>(count_as_ull);
 
     const auto [counts, displacements] = balanced_counts(count, world_size);
     const int local_count = counts[world_rank];
-    std::vector<long long> local_values(static_cast<std::size_t>(std::max(local_count, 0)), 0);
+    vector<long long> local_values(static_cast<size_t>(max(local_count, 0)), 0);
 
     MPI_Scatterv(world_rank == 0 ? global_values.data() : nullptr,
                  counts.data(),
@@ -77,7 +79,7 @@ int run_vector_accumulation(const Options& options, int world_rank, int world_si
         local_elapsed = MPI_Wtime() - start;
     }
 
-    std::vector<long long> result;
+    vector<long long> result;
     if (world_rank == 0) {
         result.resize(count, 0);
     }
@@ -96,22 +98,22 @@ int run_vector_accumulation(const Options& options, int world_rank, int world_si
     MPI_Reduce(&local_elapsed, &max_elapsed, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
     if (world_rank == 0) {
-        std::vector<long long> expected = global_values;
-        for (std::size_t index = 1; index < expected.size(); ++index) {
+        vector<long long> expected = global_values;
+        for (size_t index = 1; index < expected.size(); ++index) {
             expected[index] += expected[index - 1];
         }
         const bool valid = result == expected;
         if (!options.output_path.empty()) {
             write_vector_file(options.output_path, result);
         }
-        const auto checksum = std::accumulate(result.begin(), result.end(), 0LL);
-        const int active_processes = static_cast<int>(std::count_if(counts.begin(), counts.end(), [](int chunk) { return chunk > 0; }));
-        std::cout << "algorithm=matrix category=data_split_compute comm=" << options.comm_mode
+        const auto checksum = accumulate(result.begin(), result.end(), 0LL);
+        const int active_processes = static_cast<int>(count_if(counts.begin(), counts.end(), [](int chunk) { return chunk > 0; }));
+        cout << "algorithm=matrix category=data_split_compute comm=" << options.comm_mode
                   << " size=" << count
                   << " active_processes=" << active_processes
                   << " checksum=" << checksum
                   << " verification=" << (valid ? "PASSED" : "FAILED")
-                  << " elapsed_seconds=" << std::fixed << std::setprecision(6) << max_elapsed
+                  << " elapsed_seconds=" << fixed << setprecision(6) << max_elapsed
                   << '\n';
         if (!valid) {
             return 2;

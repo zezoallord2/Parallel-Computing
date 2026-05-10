@@ -8,12 +8,14 @@
 #include <iostream>
 #include <numeric>
 
+using namespace std;
+
 namespace pc {
 
 int run_heat_diffusion(const Options& options, int world_rank, int world_size) {
-    std::size_t rows = options.rows;
-    std::size_t cols = options.cols;
-    std::vector<double> global_grid;
+    size_t rows = options.rows;
+    size_t cols = options.cols;
+    vector<double> global_grid;
 
     if (world_rank == 0) {
         global_grid = options.input_path.empty() ? make_heat_grid(rows, cols)
@@ -24,22 +26,22 @@ int run_heat_diffusion(const Options& options, int world_rank, int world_size) {
     const auto cols_as_ull = static_cast<unsigned long long>(cols);
     unsigned long long dimensions[2] = {rows_as_ull, cols_as_ull};
     MPI_Bcast(dimensions, 2, MPI_UNSIGNED_LONG_LONG, 0, MPI_COMM_WORLD);
-    rows = static_cast<std::size_t>(dimensions[0]);
-    cols = static_cast<std::size_t>(dimensions[1]);
+    rows = static_cast<size_t>(dimensions[0]);
+    cols = static_cast<size_t>(dimensions[1]);
     require(cols >= 2 && rows >= 2, "Heat diffusion requires at least a 2x2 grid", world_rank);
 
     const auto [row_counts, row_displacements] = balanced_counts(rows, world_size);
     const int local_rows = row_counts[world_rank];
     const int local_elements = local_rows * to_int(cols, "Column count");
 
-    std::vector<int> element_counts(world_size, 0);
-    std::vector<int> element_displacements(world_size, 0);
+    vector<int> element_counts(world_size, 0);
+    vector<int> element_displacements(world_size, 0);
     for (int rank = 0; rank < world_size; ++rank) {
         element_counts[rank] = row_counts[rank] * to_int(cols, "Column count");
         element_displacements[rank] = row_displacements[rank] * to_int(cols, "Column count");
     }
 
-    std::vector<double> local_data(static_cast<std::size_t>(std::max(local_elements, 0)), 0.0);
+    vector<double> local_data(static_cast<size_t>(max(local_elements, 0)), 0.0);
     MPI_Scatterv(world_rank == 0 ? global_grid.data() : nullptr,
                  element_counts.data(),
                  element_displacements.data(),
@@ -60,12 +62,12 @@ int run_heat_diffusion(const Options& options, int world_rank, int world_size) {
         MPI_Comm_size(active_comm, &active_size);
     }
 
-    std::vector<double> current((static_cast<std::size_t>(local_rows) + 2U) * cols, 0.0);
-    std::vector<double> next = current;
+    vector<double> current((static_cast<size_t>(local_rows) + 2U) * cols, 0.0);
+    vector<double> next = current;
     for (int row = 0; row < local_rows; ++row) {
-        std::copy_n(local_data.data() + static_cast<std::size_t>(row) * cols,
+        copy_n(local_data.data() + static_cast<size_t>(row) * cols,
                     cols,
-                    current.data() + static_cast<std::size_t>(row + 1) * cols);
+                    current.data() + static_cast<size_t>(row + 1) * cols);
     }
 
     double final_delta = 0.0;
@@ -75,7 +77,7 @@ int run_heat_diffusion(const Options& options, int world_rank, int world_size) {
         MPI_Barrier(active_comm);
         const double start = MPI_Wtime();
 
-        for (std::size_t iteration = 0; iteration < options.iterations; ++iteration) {
+        for (size_t iteration = 0; iteration < options.iterations; ++iteration) {
             if (active_size > 1) {
                 if (options.comm_mode == "blocking") {
                     exchange_halos_blocking(active_comm, active_rank, active_size, current, local_rows, to_int(cols, "Column count"));
@@ -90,8 +92,8 @@ int run_heat_diffusion(const Options& options, int world_rank, int world_size) {
             double local_delta = 0.0;
             for (int local_row = 1; local_row <= local_rows; ++local_row) {
                 const int global_row = global_start_row + local_row - 1;
-                for (std::size_t col = 0; col < cols; ++col) {
-                    const std::size_t index = static_cast<std::size_t>(local_row) * cols + col;
+                for (size_t col = 0; col < cols; ++col) {
+                    const size_t index = static_cast<size_t>(local_row) * cols + col;
                     const bool boundary = global_row == 0 || global_row == static_cast<int>(rows) - 1 || col == 0 || col + 1 == cols;
                     if (boundary) {
                         next[index] = current[index];
@@ -103,12 +105,12 @@ int run_heat_diffusion(const Options& options, int world_rank, int world_size) {
                                             current[index + 1] +
                                             current[index - cols] +
                                             current[index + cols]) / 5.0;
-                    local_delta = std::max(local_delta, std::abs(updated - current[index]));
+                    local_delta = max(local_delta, abs(updated - current[index]));
                     next[index] = updated;
                 }
             }
 
-            std::swap(current, next);
+            swap(current, next);
             MPI_Allreduce(&local_delta, &final_delta, 1, MPI_DOUBLE, MPI_MAX, active_comm);
         }
 
@@ -116,12 +118,12 @@ int run_heat_diffusion(const Options& options, int world_rank, int world_size) {
     }
 
     for (int row = 0; row < local_rows; ++row) {
-        std::copy_n(current.data() + static_cast<std::size_t>(row + 1) * cols,
+        copy_n(current.data() + static_cast<size_t>(row + 1) * cols,
                     cols,
-                    local_data.data() + static_cast<std::size_t>(row) * cols);
+                    local_data.data() + static_cast<size_t>(row) * cols);
     }
 
-    std::vector<double> result;
+    vector<double> result;
     if (world_rank == 0) {
         result.resize(rows * cols, 0.0);
     }
@@ -144,9 +146,9 @@ int run_heat_diffusion(const Options& options, int world_rank, int world_size) {
             write_matrix_file(options.output_path, rows, cols, result);
         }
 
-        const double checksum = std::accumulate(result.begin(), result.end(), 0.0);
-        const int active_processes = static_cast<int>(std::count_if(row_counts.begin(), row_counts.end(), [](int count) { return count > 0; }));
-        std::cout << std::fixed << std::setprecision(6)
+        const double checksum = accumulate(result.begin(), result.end(), 0.0);
+        const int active_processes = static_cast<int>(count_if(row_counts.begin(), row_counts.end(), [](int count) { return count > 0; }));
+        cout << fixed << setprecision(6)
                   << "algorithm=heat comm=" << options.comm_mode
                   << " rows=" << rows
                   << " cols=" << cols

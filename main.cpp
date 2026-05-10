@@ -5,6 +5,8 @@
 
 #include "utils.hpp"
 
+using namespace std;
+
 namespace pc {
 int run_heat_diffusion(const Options& options, int world_rank, int world_size);
 int run_vector_accumulation(const Options& options, int world_rank, int world_size);
@@ -21,7 +23,7 @@ int main(int argc, char** argv) {
     int exit_code = 0;
     try {
         pc::require(world_size >= 2,
-                    "Run this program with at least 2 MPI processes (currently running with " + std::to_string(world_size) + ")",
+                    "Run this program with at least 2 MPI processes (currently running with " + to_string(world_size) + ")",
                     world_rank);
         const pc::Options options = pc::parse_args(argc, argv, world_rank);
         if (options.algorithm == "heat") {
@@ -29,7 +31,7 @@ int main(int argc, char** argv) {
         } else if (options.algorithm == "matrix") {
             exit_code = pc::run_vector_accumulation(options, world_rank, world_size);
         }
-    } catch (const std::exception&) {
+    } catch (const exception&) {
         exit_code = 1;
     }
 
